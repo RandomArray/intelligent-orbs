@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Compile
+        run: python -m py_compile intelligent_orbs.py orb_monitor.py launcher.py smoke_test.py
+      - name: Smoke test
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python smoke_test.py
+      - name: Headless ecosystem run
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          python - <<'EOF'
+          from intelligent_orbs import World
+          world = World(1280, 720)
+          world.populate()
+          for _ in range(3000):
+              world.step()
+          alive = [o for o in world.orbs if o.alive]
+          print(f"frame {world.frame}: {len(alive)} alive")
+          assert alive, "the ecosystem died out"
+          EOF
